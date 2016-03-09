@@ -1,0 +1,220 @@
+<?php
+/**
+ * @file
+ * Hijri Date Widget, Form Element and Formatter module.
+ */
+
+module_load_include('inc', 'taarikh', 'taarikh.widget');
+module_load_include('inc', 'taarikh', 'taarikh.element');
+module_load_include('inc', 'taarikh', 'taarikh.formatter');
+
+/**
+ * Load needed files.
+ *
+ * Play nice with jQuery UI.
+ */
+function taarikh_add() {
+  static $loaded = FALSE;
+  if ($loaded) {
+    return;
+  }
+  drupal_add_library('system', 'ui.datepicker');
+
+  // Add Keith Wood Calendar Picker plugins.
+  $calendars_path = libraries_get_path('jquery.calendars');
+  if ($calendars_path) {
+    drupal_add_js($calendars_path . '/jquery.calendars.js');
+    drupal_add_js($calendars_path . '/jquery.calendars.plus.js');
+    drupal_add_js($calendars_path . '/jquery.calendars.islamic.js');
+    drupal_add_js($calendars_path . '/jquery.calendars.picker.js');
+    drupal_add_css($calendars_path . '/smoothness.calendars.picker.css');
+    drupal_add_css($calendars_path . '/ui.calendars.picker.css');
+  }
+
+  drupal_add_css(drupal_get_path('module', 'taarikh') . '/taarikh.css');
+  $loaded = TRUE;
+}
+
+/**
+ * Create a unique CSS id.
+ *
+ * Create a unique CSS id name and output a single inline JS block for
+ * each startup function to call and settings array to pass it. This
+ * used to create a unique CSS class for each unique combination of
+ * function and settings, but using classes requires a DOM traversal
+ * and is much slower than an id lookup.  The new approach returns to
+ * requiring a duplicate copy of the settings/code for every element
+ * that uses them, but is much faster.  We could combine the logic by
+ * putting the ids for each unique function/settings combo into
+ * Drupal.settings and searching for each listed id.
+ *
+ * @param string $id
+ *   The CSS class prefix to search the DOM for.
+ * @param string $func
+ *   The jQuery function to invoke on each DOM element containing the
+ *   returned CSS class.
+ * @param array $settings
+ *   The settings array to pass to the jQuery function.
+ *
+ * @return string
+ *   The CSS id to assign to the element that should have
+ *   $func($settings) invoked on it.
+ */
+function taarikh_js_settings_id($id, $func, array $settings) {
+  static $js_added = FALSE;
+  static $id_count = array();
+
+  // Make sure popup date selector grid is in correct year.
+  if (!empty($settings['yearRange'])) {
+    $parts = explode(':', $settings['yearRange']);
+    // Set the default date to 0 or the lowest bound if the date ranges
+    // do not include the current year.
+    // Necessary for the datepicker to render and select dates correctly.
+    $default_date = ($parts[0] > 0 || 0 > $parts[1]) ? $parts[0] : 0;
+    $settings += array('defaultDate' => (string) $default_date . 'y');
+  }
+
+  if (!$js_added) {
+    drupal_add_js(drupal_get_path('module', 'taarikh') . '/taarikh.js');
+    $js_added = TRUE;
+  }
+
+  // We use a static array to account for possible multiple form_builder()
+  // calls in the same request (form instance on 'Preview').
+  if (!isset($id_count[$id])) {
+    $id_count[$id] = 0;
+  }
+
+  // We need the additional id_count for this to
+  // work correctly when there are multiple values.
+  $return_id = "$id-$func-popup-" . $id_count[$id]++;
+  $js_settings['hijriDatePopup'][$return_id] = array(
+    'func' => $func,
+    'settings' => $settings,
+  );
+  drupal_add_js($js_settings, 'setting');
+  return $return_id;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function taarikh_theme() {
+  return array(
+    'taarikh_popup' => array('render element' => 'element'),
+  );
+}
+
+/**
+ * Format a date popup element.
+ *
+ * Use a class that will float date and time next to each other.
+ */
+function theme_taarikh_popup($vars) {
+  $element = $vars['element'];
+  $attributes = !empty($element['#wrapper_attributes']) ? $element['#wrapper_attributes'] : array('class' => array());
+  $attributes['class'][] = 'container-inline-date';
+  // If there is no description, the floating date elements need some
+  // extra padding below them.
+  $wrapper_attributes = array('class' => array('date-padding'));
+  if (empty($element['date']['#description'])) {
+    $wrapper_attributes['class'][] = 'clearfix';
+  }
+  // Add an wrapper to mimic the way a single value field works,
+  // for ease in using #states.
+  if (isset($element['#children'])) {
+    $element['#children'] = '<div id="' . $element['#id'] . '" ' . drupal_attributes($wrapper_attributes) . '>' . $element['#children'] . '</div>';
+  }
+  return '<div ' . drupal_attributes($attributes) . '>' . theme('form_element', $element) . '</div>';
+}
+
+/**
+ * Recreate a date format string so it has the values popup expects.
+ *
+ * @param string $format
+ *   A normal date format string, like Y-m-d.
+ *
+ * @return string
+ *   A format string in popup format, like YMD-, for the
+ *   earlier 'calendar' version, or m/d/Y for the later 'datepicker'
+ *   version.
+ */
+function taarikh_format_to_popup($format) {
+  if (empty($format)) {
+    $format = 'Y-m-d';
+  }
+  $replace = taarikh_datepicker_format_replacements();
+  return strtr($format, $replace);
+}
+
+/**
+ * The format replacement patterns for the new datepicker.
+ */
+function taarikh_datepicker_format_replacements() {
+  return array(
+    'd' => 'dd',
+    'j' => 'd',
+    'l' => 'DD',
+    'D' => 'D',
+    'm' => 'mm',
+    'n' => 'm',
+    'F' => 'MM',
+    'M' => 'M',
+    'Y' => 'yyyy',
+    'y' => 'yy',
+  );
+}
+
+/**
+ * Helper function for extracting a hijri date value out of user input.
+ */
+function taarikh_input_date($element, $input) {
+  if (empty($input['date'])) {
+    return NULL;
+  }
+
+  // Remove $franularity for now as we don't support a timepicker yet.
+  // $granularity = date_format_order($element['#date_format']);
+  // $has_time = date_has_time($granularity);
+  $has_time = FALSE;
+
+  $format = date_popup_date_format($element);
+  $format .= $has_time ? ' ' . date_popup_time_format($element) : '';
+  $datetime = $input['date'];
+  $datetime .= $has_time ? ' ' . $input['time'] : '';
+
+  return taarikh_api_parse($datetime, $format);
+}
+
+/**
+ * Helper function for extracting a hijri date value out of select user input.
+ */
+function taarikh_select_input_date($element, $input) {
+  // Was anything entered? If not, we have no date.
+  if (!is_array($input)) {
+    return NULL;
+  }
+  else {
+    $entered = array_values(array_filter($input));
+    if (empty($entered)) {
+      return NULL;
+    }
+  }
+  $granularity = date_format_order($element['#date_format']);
+  if (isset($input['ampm'])) {
+    if ($input['ampm'] == 'pm' && $input['hour'] < 12) {
+      $input['hour'] += 12;
+    }
+    elseif ($input['ampm'] == 'am' && $input['hour'] == 12) {
+      $input['hour'] -= 12;
+    }
+  }
+  unset($input['ampm']);
+
+  // Make the input match the granularity.
+  foreach (date_nongranularity($granularity) as $part) {
+    unset($input[$part]);
+  }
+
+  return $input;
+}

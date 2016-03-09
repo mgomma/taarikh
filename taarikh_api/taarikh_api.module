@@ -1,0 +1,393 @@
+<?php
+/**
+ * @file
+ * Functions to help Hijri - Gregorian date conversions.
+ */
+
+define('TAARIKH_API_EPOCH', 1948083.5);
+
+global $_taarikh_month_array;
+$_taarikh_month_array = array(
+  1 => array(
+    'long' => t('Moharramul Haram'),
+    'short' => t('Moharram'),
+  ),
+  2 => array(
+    'long' => t('Safarul Muzaffar'),
+    'short' => t('Safar'),
+  ),
+  3 => array(
+    'long' => t('Rabiul Awwal'),
+    'short' => t('Rabiul Awwal'),
+  ),
+  4 => array(
+    'long' => t('Rabiul Aakhar'),
+    'short' => t('Rabiul Aakhar'),
+  ),
+  5 => array(
+    'long' => t('Jumadil Awwal'),
+    'short' => t('Jumadil Awwal'),
+  ),
+  6 => array(
+    'long' => t('Jumadil Aakhar'),
+    'short' => t('Jumadil Aakhar'),
+  ),
+  7 => array(
+    'long' => t('Rajabul Asab'),
+    'short' => t('Rajab'),
+  ),
+  8 => array(
+    'long' => t('Shabanul Karim'),
+    'short' => t('Shaban'),
+  ),
+  9 => array(
+    'long' => t('Ramadanul Moazzam'),
+    'short' => t('Ramadan'),
+  ),
+  10 => array(
+    'long' => t('Shawwalul Mukarram'),
+    'short' => t('Shawwal'),
+  ),
+  11 => array(
+    'long' => t('Zilqadatil Haram'),
+    'short' => t('Zilqad'),
+  ),
+  12 => array(
+    'long' => t('Zilhajjatil Haram'),
+    'short' => t('Zilhajj'),
+  ),
+);
+
+/**
+ * Return today's date according to Hijri Calendar.
+ */
+function taarikh_api_today() {
+  $date = getdate();
+  return taarikh_api_convert($date['year'], $date['mon'], $date['mday']);
+}
+
+/**
+ * Return the Hijri month name for the given month.
+ */
+function taarikh_api_month($month, $type = 'short') {
+  global $_taarikh_month_array;
+  return $_taarikh_month_array[$month][$type];
+}
+
+/**
+ * Check if the year is kabisa.
+ */
+function taarikh_api_is_kabisa($year) {
+  $leaps = array(2, 5, 8, 10, 13, 16, 19, 21, 24, 27, 29);
+  return in_array($year % 30, $leaps);
+}
+
+/**
+ * Check if the hijri date is valid.
+ */
+function taarikh_api_is_valid($date) {
+  $year = $date['year'];
+  $month = $date['month'];
+  $day = $date['day'];
+
+  if ($month < 1 || $month > 12) {
+    return FALSE;
+  }
+  $days_in_month = 30;
+  if (($month == 12 && !taarikh_api_is_kabisa($year))
+    || ($month % 2 == 0)) {
+    $days_in_month = 29;
+  }
+
+  if ($day > $days_in_month) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/**
+ * Emulates some of the date() formatters for hijri dates.
+ */
+function taarikh_api_format($format, $date = NULL) {
+  if ($date == NULL) {
+    $date = taarikh_api_today();
+  }
+
+  if (isset($date['year'])) {
+    $date[0] = $date['year'];
+  }
+  if (isset($date['month'])) {
+    $date[1] = $date['year'];
+  }
+  if (isset($date['day'])) {
+    $date[2] = $date['year'];
+  }
+
+  $return = "";
+  $backslash = FALSE;
+
+  for ($i = 0; $i < strlen($format); $i++) {
+    $format_char = $format[$i];
+    if ($backslash) {
+      $return .= $format_char;
+      $backslash = FALSE;
+    }
+    else {
+      switch ($format_char) {
+        case "\\":
+          $backslash = TRUE;
+          break;
+
+        case "Y":
+          $return .= $date[0];
+          break;
+
+        case "y":
+          $return .= substr($date[0], 2);
+          break;
+
+        case "M":
+          $return .= taarikh_api_month($date[1], 'short');
+          break;
+
+        case "F":
+          $return .= taarikh_api_month($date[1], 'long');
+          break;
+
+        case "m":
+          $return .= $date[1];
+          break;
+
+        case "d":
+          $return .= str_pad($date[2], 2, "0", STR_PAD_LEFT);
+          break;
+
+        case "j":
+          $return .= $date[2];
+          break;
+
+        case "S":
+          $d = (int) $date[2];
+          if ($d > 3 && $d < 21 || $d > 23 && $d < 31) {
+            $return .= "th";
+          }
+          elseif ($d % 10 == 1) {
+            $return .= "st";
+          }
+          elseif ($d % 10 == 2) {
+            $return .= "nd";
+          }
+          elseif ($d % 10 == 3) {
+            $return .= "rd";
+          }
+          break;
+
+        case "t":
+          if ($date[1] == 12) {
+            // Check if the year is Kabisa.
+            $return .= taarikh_api_is_kabisa($date[0]) ? 30 : 29;
+          }
+          else {
+            // All odd numbered months have 30 days and rest have 29.
+            $return .= ($date[1] % 2 == 0) ? 29 : 30;
+          }
+          break;
+
+        default:
+          $return .= $format_char;
+      }
+    }
+  }
+
+  return $return;
+}
+
+/**
+ * Parse a hijri date according to a given format.
+ */
+function taarikh_api_parse($datetime, $format) {
+  $maxlen = strlen($format);
+  $patterns = date_format_patterns();
+  $value_pos = 0;
+  $final_date = array();
+  for ($i = 0; $i < $maxlen; $i++) {
+    $c = $format[$i];
+    // Load the pattern for the character or, if not available,
+    // match the character itself.
+    $regex = isset($patterns[$c]) ? $patterns[$c] : preg_quote($c, "/");
+    $regex = "/$regex/";
+
+    $m = NULL;
+    preg_match($regex, substr($datetime, $value_pos), $m);
+    if (empty($m)) {
+      // No matches, the date doesn't match the format.
+      return FALSE;
+    }
+
+    $value_pos += strlen($m[0]);
+    $value = $m[0];
+
+    switch ($c) {
+      case 'd':
+      case 'j':
+        $final_date['day'] = intval($value);
+        break;
+
+      case 'n':
+      case 'm':
+        $final_date['month'] = intval($value);
+        break;
+
+      case 'Y':
+        $final_date['year'] = $value;
+        break;
+
+      case 'y':
+        $year = $value;
+        // If no century, we add the current one ("06" => "1406").
+        $final_date['year'] = str_pad($year, 4, substr(taarikh_api_format("Y"), 0, 2), STR_PAD_LEFT);
+        break;
+    }
+  }
+
+  return $final_date;
+}
+
+/**
+ * Convert a gregorian date to hijri.
+ *
+ * @param int $year
+ *   Gregorian year.
+ * @param int $month
+ *   Gregorian month.
+ * @param int $day
+ *   Gregorian day.
+ *
+ * @return array
+ *   Hijri date [int Year, int Month, int Day] (Islamic calendar)
+ */
+function taarikh_api_convert($year, $month, $day) {
+  $jd = gregoriantojd($month, $day, $year);
+  return _taarikh_api_from_jd($jd);
+}
+
+/**
+ * Convert a hijri date to gregorian.
+ *
+ * @param int $year
+ *   Hijri year.
+ * @param int $month
+ *   Hijri month.
+ * @param int $day
+ *   Hijri day.
+ *
+ * @return string
+ *   Gregorian date "month/day/year"
+ */
+function taarikh_api_convert_to_gregorian($year, $month, $day) {
+  $jd = _taarikh_api_to_jd($year, $month, $day);
+  return jdtogregorian($jd);
+}
+
+/**
+ * Convert given Julian day into Hijri date (Islamic calendar).
+ *
+ * @param int $jd
+ *   Julian day.
+ *
+ * @return array
+ *   Hijri date [int Year, int Month, int Day] (Islamic calendar).
+ */
+function _taarikh_api_from_jd($jd) {
+  $jd = floor($jd) - 0.5;
+  $days_per_year = 10631 / 30;
+
+  // Results in years 2, 5, 8, 10, 13, 16, 19, 21, 24, 27 & 29 as leap years.
+  $shift3 = 0.01 / 30;
+
+  $z = $jd - TAARIKH_API_EPOCH;
+  $cyc = floor($z / 10631);
+  $z -= 10631 * $cyc;
+  $j = floor(($z - $shift3) / $days_per_year);
+  $year = 30 * $cyc + $j;
+  $z -= floor($j * $days_per_year + $shift3);
+  $month = floor(($z + 28.5001) / 29.5);
+  if ($month == 13) {
+    $month = 12;
+  }
+  $day = $z - floor(29.5001 * $month - 29);
+
+  return array($year, $month, $day);
+}
+
+/**
+ * Convert given Hijri date (Islamic calendar) into Julian day.
+ *
+ * @param int $year
+ *   Hijri year.
+ * @param int $month
+ *   Hijri month.
+ * @param int $day
+ *   Hijri day.
+ *
+ * @return int
+ *   Julian day
+ *
+ * @desc islamic_to_jd will.
+ */
+function _taarikh_api_to_jd($year, $month, $day) {
+  return ($day +
+    ceil(29.5 * ($month - 1)) +
+    (354 * ($year)) +
+    floor(((11 * $year)) / 30) +
+    TAARIKH_API_EPOCH) - 0.5;
+}
+
+/**
+ * Return list of years around the current year as per specified pattern.
+ *
+ * @param string $string
+ *   Pattern such as -5:5 or 0:+1 or 2008:2010 to define the range of years.
+ * @param int $year
+ *   Year that must be included in the range.
+ *
+ * @return array
+ *   Array of years as per the specified pattern.
+ */
+function taarikh_range_years($string, $year = NULL) {
+  $this_year = (int) taarikh_api_format('Y');
+  list($min_year, $max_year) = explode(':', $string);
+
+  // Valid patterns would be -5:+5, 0:+1, 2008:2010.
+  $plus_pattern = '@[\+|\-][0-9]{1,4}@';
+  $year_pattern = '@^[0-9]{4}@';
+  if (!preg_match($year_pattern, $min_year, $matches)) {
+    if (preg_match($plus_pattern, $min_year, $matches)) {
+      $min_year = $this_year + $matches[0];
+    }
+    else {
+      $min_year = $this_year;
+    }
+  }
+  if (!preg_match($year_pattern, $max_year, $matches)) {
+    if (preg_match($plus_pattern, $max_year, $matches)) {
+      $max_year = $this_year + $matches[0];
+    }
+    else {
+      $max_year = $this_year;
+    }
+  }
+  // We expect the $min year to be less than the $max year.
+  // Some custom values for -99:+99 might not obey that.
+  if ($min_year > $max_year) {
+    $temp = $max_year;
+    $max_year = $min_year;
+    $min_year = $temp;
+  }
+  if (!empty($year)) {
+    $min_year = min($year, $min_year);
+    $max_year = max($year, $max_year);
+  }
+  return array($min_year, $max_year);
+}
