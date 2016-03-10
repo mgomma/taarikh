@@ -1,0 +1,13 @@
+taarikh: 
+  version: VERSION
+  js: 
+    js/jquery.plugin.min.js: {}
+    js/jquery.calendars.all.min.js: {}
+    js/jquery.calendars.islamic.js: {}
+    js/taarikh.js: {}
+  css: 
+      theme: 
+        css/taarikh.css: {}
+        css/jquery.calendars.picker.css: {}
+  dependencies: 
+    - core/jquery

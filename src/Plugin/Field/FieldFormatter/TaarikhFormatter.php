@@ -9,6 +9,8 @@ namespace Drupal\taarikh\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Datetime\DrupalDateTime;  
+
 
 /**
  * Plugin implementation of the 'field_example_simple_text' formatter.
@@ -37,14 +39,24 @@ class TaarikhFormatter extends FormatterBase {
         // See theme_html_tag().
         '#type' => 'html_tag',
         '#tag' => 'p',
-        '#attributes' => array(
-          'style' => 'color: ' . $item->value,
-        ),
-        '#value' => $this->t('The color code in this field is @code', array('@code' => $item->value)),
+        '#value' => $this->hijri_date_display($item->value),
       );
     }
 
     return $elements;
+  }
+
+  /**
+   * display hijri date wiht the default format.
+   * @param type $date
+   * @return type
+   */
+  public function hijri_date_display($date) {     
+    list($year,$month, $day) = explode("-", $date);
+    $hijri_data = taarikh_api_convert($year, $month, $day);
+
+    $hijri_data_object = new DrupalDateTime(implode('-', $hijri_data));
+    return $hijri_data_object->format(DrupalDateTime::FORMAT);
   }
 
 }

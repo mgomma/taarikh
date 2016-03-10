@@ -2,31 +2,15 @@
  * @file
  * Attaches the calendar behavior to all required fields.
  */
-
 (function ($) {
-    Drupal.behaviors.taarikhPopup = {
-        attach: function (context, settings) {
-            for (var id in Drupal.settings.hijriDatePopup) {
-        $('#' + id).bind('focus', settings.hijriDatePopup[id], function(e) {
-                    if (!$(this).hasClass('date-popup-init')) {
-                        var datePopup = e.data;
-                        datePopup.settings.calendar = $.calendars.instance('hijri');
-                        // Explicitely filter the methods we accept.
-                        switch (datePopup.func) {
-                            case 'calendarpicker':
-                                $(this)
-                                        .calendarsPicker(datePopup.settings)
-                                        .addClass('date-popup-init')
-                                        .focus();
-                                break;
-                        }
-                    }
-                });
-            }
-        }
-    };
+  Drupal.behaviors.taarikhPopup = {
+    attach: function (context, settings) {
+      var calendar = $.calendars.instance('Hijri');
+      $('.field--widget-popup-calendar-hijri input').calendarsPicker({calendar: calendar, dateFormat: 'yyyy-mm-dd'});
+    }
+  };
 })(jQuery);
-
+//
 // Override islamic calendar implementation.
 (function($) {
     function HijriCalendar(language) {
@@ -42,7 +26,7 @@
                 regional: {
                     '': {
                         // The calendar name.
-                        name: Drupal.t('Hijri'),
+                        name: 'Hijri',
                         epochs: ['BH', 'AH'],
                         monthNames: [Drupal.t('Muharram'), Drupal.t('Safar'), Drupal.t('Rabi\' al-awwal'), Drupal.t('Rabi\' al-aakhar'),
                             Drupal.t('Jumada al-awwal'), Drupal.t('Jumada al-aakhar'), Drupal.t('Rajab'), Drupal.t('Sha\'aban'),
@@ -54,7 +38,7 @@
                         dayNamesShort: [Drupal.t('Sun'), Drupal.t('Mon'), Drupal.t('Tue'), Drupal.t('Wed'), Drupal.t('Thu'), Drupal.t('Fru'), Drupal.t('Sat')],
                         dayNamesMin: [Drupal.t('Su'), Drupal.t('Mo'), Drupal.t('Tu'), Drupal.t('We'), Drupal.t('Th'), Drupal.t('Fr'), Drupal.t('Sa')],
                         // See format options on BaseCalendar.formatDate.
-                        dateFormat: 'yyyy/mm/dd',
+                        dateFormat: 'yyyy-mm-dd',
                         // The first day of the week, Sun = 0, Mon = 1, ...
                         firstDay: 0,
                         // True if right-to-left language, false if left-to-right.

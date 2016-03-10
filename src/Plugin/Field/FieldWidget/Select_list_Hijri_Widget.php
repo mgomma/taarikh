@@ -10,6 +10,7 @@ namespace Drupal\taarikh\Plugin\Field\FieldWidget;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase;
 
 /**
  * @FieldWidget(
@@ -21,23 +22,15 @@ use Drupal\Core\Form\FormStateInterface;
  *   }
  * )
  */
-class Select_list_Hijri_Widget extends WidgetBase {
-
+class Select_list_Hijri_Widget extends DateTimeWidgetBase {
+  
   /**
    * {@inheritdoc}
    */
   public function formElement(FieldItemListInterface $items, $delta, array $element, array &$form, FormStateInterface $form_state) {
-    $value = isset($items[$delta]->value) ? $items[$delta]->value : '';
-    $element += array(
-      '#type' => 'textfield',
-      '#default_value' => $value,
-      '#size' => 7,
-      '#maxlength' => 7,
-      '#element_validate' => array(
-        array($this, 'validate'),
-      ),
-    );
-    return array('value' => $element);
+    $element = parent::formElement($items, $delta, $element, $form, $form_state);
+//    echo '<pre>';    print_r($form); exit;
+    return $element;
   }
 
   /**
