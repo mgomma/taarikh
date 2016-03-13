@@ -10,7 +10,7 @@ namespace Drupal\taarikh\Plugin\Field\FieldWidget;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase;
+use \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeDefaultWidget;
 use Drupal\Core\Datetime\DrupalDateTime;  
   
   
@@ -24,7 +24,7 @@ use Drupal\Core\Datetime\DrupalDateTime;
  *   }
  * )
  */
-class Popup_Calendar_Hijri_Widget extends DateTimeWidgetBase {
+class Popup_Calendar_Hijri_Widget extends DateTimeDefaultWidget {
   
  /**
    * {@inheritdoc}
@@ -52,21 +52,9 @@ class Popup_Calendar_Hijri_Widget extends DateTimeWidgetBase {
     $date = explode("-", $element['value']['#value']['date']);
     $gregorian_date = taarikh_api_convert_to_gregorian($date[0], $date[1], $date[2]);
     
-//    $date = new DrupalDateTime($gregorian_date);
-//    $form_state->setValueForElement($element, $date->format(DrupalDateTime::FORMAT));
-    
     $form_state->getValues()['field_dat'][0]['value'] = $element['value']['#value']['object'] = new DrupalDateTime($gregorian_date);
     $element['value']['#value']['date'] = str_replace('/', '-', $gregorian_date);
-//          echo '<pre>';    print_r($form_state->getValues()); exit;
 
     return true;
-//    if (strlen($value) == 0) {
-//      $form_state->setValueForElement($element, '');
-//      return;
-//    }
-//    if (!preg_match('/^#([a-f0-9]{6})$/iD', strtolower($value))) {
-//      $form_state->setError($element, t("Color must be a 6-digit hexadecimal value, suitable for CSS."));
-//    }
   }
-    
-}
+  }
