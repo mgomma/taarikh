@@ -7,7 +7,7 @@
 
 namespace Drupal\taarikh\Plugin\Field\FieldFormatter;
 use Drupal\Core\Form\FormStateInterface;
-
+use \Drupal\Core\Datetime\Entity\DateFormat;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Datetime\DrupalDateTime;
 use \Drupal\datetime\Plugin\Field\FieldFormatter\DateTimeDefaultFormatter;
@@ -27,13 +27,25 @@ use \Drupal\datetime\Plugin\Field\FieldFormatter\DateTimeDefaultFormatter;
  */
 class TaarikhFormatter extends DateTimeDefaultFormatter {
 
+  public $islamic_month_display = FALSE;
+  public $month_number = 0;
   /**
    * {@inheritdoc}
    * Copied from parent class and edited to display the Hijri date.
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $elements = array();
-
+    
+    $format = \Drupal\Core\Datetime\Entity\DateFormat::load($this->getSetting('format_type'))->getPattern();
+    //check if the format have month textual display to replace by islamic month
+    If(strstr($format, 'F')){
+      $this->islamic_month_display = 'f';
+    }else if(strstr($format, 'M')){
+      $this->islamic_month_display = 'm';
+    }
+    /**
+     * @TODO: handle month names search for F,M to display islamic month names
+     */
     foreach ($items as $delta => $item) {
       $output = '';
 
@@ -45,6 +57,14 @@ class TaarikhFormatter extends DateTimeDefaultFormatter {
         $time = $date->format(' H:i:s');
         
         $hijri_date = taarikh_api_convert($year, $month, $day);
+        
+        if($this->islamic_month_display){
+          global $_taarikh_month_array;
+          //reset to January in order to replace from $_taarikh_month_array. 
+          $this->month_number = $hijri_date[1];
+          $hijri_date[1] = 1;
+        }
+        
         $hijri_date_time = implode('-', $hijri_date).$time;
         $hijri_data_object = new DrupalDateTime($hijri_date_time);
 
@@ -55,6 +75,12 @@ class TaarikhFormatter extends DateTimeDefaultFormatter {
         $this->setTimeZone($date);
 
         $output = $this->formatDate($hijri_data_object);
+        if($this->islamic_month_display == 'm'){
+          $output = str_replace('Jan', $_taarikh_month_array[$this->month_number]['short'], $output);
+        }
+        elseif($this->islamic_month_display == 'f'){
+          $output = str_replace('January', $_taarikh_month_array[$this->month_number]['long'], $output);
+        }
       }
 
       // Display the date using theme datetime.
